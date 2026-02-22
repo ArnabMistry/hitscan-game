@@ -58,26 +58,17 @@ function drawTargets(ctx, targets) {
   }
 }
 
-function drawProjectiles(ctx, projectiles) {
-  ctx.fillStyle = COLOR_FG;
-  for (let i = 0; i < projectiles.length; i += 1) {
-    const projectile = projectiles[i];
-    ctx.beginPath();
-    ctx.arc(projectile.x, projectile.y, projectile.radius, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
-
-function drawPointer(ctx, pointer, showHelper, direction) {
+function drawPointer(ctx, pointer, showHelper, direction, nowMs) {
   if (!pointer.visible) {
     return;
   }
 
-  const size = pointer.size ?? POINTER_SIZE;
+  const flashing = nowMs < (pointer.flashUntil ?? 0);
+  const size = (pointer.size ?? POINTER_SIZE) + (flashing ? 4 : 0);
   const x = pointer.x;
   const y = pointer.y;
 
-  ctx.strokeStyle = COLOR_FG;
+  ctx.strokeStyle = flashing ? '#ffffff' : pointer.locked ? '#00ffff' : COLOR_FG;
   ctx.lineWidth = POINTER_STROKE;
   ctx.beginPath();
   ctx.moveTo(x - size, y);
@@ -248,12 +239,12 @@ export function GameCanvas({ runtimeRef, running, paused, debug, mode }) {
         drawIdle(ctx, WORLD_WIDTH, WORLD_HEIGHT);
       } else {
         drawTargets(ctx, snapshot.targets);
-        drawProjectiles(ctx, snapshot.projectiles);
         drawPointer(
           ctx,
           snapshot.pointer,
           mode === GAME_MODE.TRAINING,
           runtime.lastGesture?.direction,
+          now,
         );
 
         if (debug) {

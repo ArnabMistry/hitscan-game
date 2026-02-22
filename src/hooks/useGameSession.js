@@ -6,6 +6,10 @@ const IDLE_DIAGNOSTICS = {
   deltaY: 0,
   gunPose: false,
   shoot: false,
+  indexExtended: false,
+  middleExtended: false,
+  ringExtended: false,
+  pinkyExtended: false,
   fps: 0,
 };
 
@@ -105,6 +109,10 @@ export function useGameSession(videoRef) {
         deltaY: Number((last.deltaY ?? 0).toFixed(4)),
         gunPose: Boolean(last.gunPose),
         shoot: Boolean(last.shoot),
+        indexExtended: Boolean(last.indexExtended),
+        middleExtended: Boolean(last.middleExtended),
+        ringExtended: Boolean(last.ringExtended),
+        pinkyExtended: Boolean(last.pinkyExtended),
         fps: runtime.lastFps,
       });
     }, 100);

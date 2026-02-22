@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createGestureDetector } from '../gestureDetector.js';
 
-function createPose({ indexExtended = true } = {}) {
+function createPose({ indexExtended = true, middleExtended = true } = {}) {
   const points = Array.from({ length: 21 }, () => ({ x: 0.5, y: 0.5, z: 0 }));
 
   points[0] = { x: 0.5, y: 0.8, z: 0 };
@@ -10,7 +10,7 @@ function createPose({ indexExtended = true } = {}) {
   points[8] = { x: 0.48, y: indexExtended ? 0.35 : 0.75, z: 0 };
 
   points[10] = { x: 0.52, y: 0.56, z: 0 };
-  points[12] = { x: 0.52, y: 0.7, z: 0 };
+  points[12] = { x: 0.52, y: middleExtended ? 0.3 : 0.7, z: 0 };
   points[14] = { x: 0.54, y: 0.56, z: 0 };
   points[16] = { x: 0.54, y: 0.7, z: 0 };
   points[18] = { x: 0.56, y: 0.56, z: 0 };

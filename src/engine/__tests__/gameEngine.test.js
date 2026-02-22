@@ -6,7 +6,7 @@ function visiblePointer(x, y) {
 }
 
 describe('gameEngine', () => {
-  it('spawns wave on start and advances projectile with dt', () => {
+  it('spawns wave on start and performs hitscan without projectiles', () => {
     const engine = createGameEngine({ width: 640, height: 360 });
     engine.reset();
     engine.start();
@@ -14,20 +14,17 @@ describe('gameEngine', () => {
     const before = engine.getSnapshot();
     expect(before.targets.length).toBeGreaterThan(0);
 
+    const target = before.targets[0];
     engine.update(
       1 / 60,
-      visiblePointer(30, 300),
+      visiblePointer(target.x, target.y),
       { shoot: true, direction: { x: 1, y: 0, mag: 1 } },
       1000,
     );
 
     const afterShoot = engine.getSnapshot();
-    expect(afterShoot.projectiles.length).toBe(1);
-
-    const x1 = afterShoot.projectiles[0].x;
-    engine.update(1 / 60, visiblePointer(30, 300), { shoot: false }, 1016);
-    const afterMove = engine.getSnapshot();
-    expect(afterMove.projectiles[0].x).toBeGreaterThan(x1);
+    expect(afterShoot.projectiles.length).toBe(0);
+    expect(afterShoot.score).toBeGreaterThanOrEqual(1);
   });
 
   it('keeps targets within bounds through bounce updates', () => {

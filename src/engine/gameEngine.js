@@ -4,12 +4,8 @@ import {
   COLOR_FG,
   FRAME_DT_MAX,
   FRAME_DT_MIN,
-  MAX_PROJECTILES,
   MAX_TARGET_COUNT,
   POINTER_SIZE,
-  PROJECTILE_RADIUS,
-  PROJECTILE_SPEED,
-  RECOIL_PIXELS,
   TARGET_BASE_SPEED,
   TARGET_RADIUS,
   TARGET_SPEED_STEP,
@@ -63,15 +59,13 @@ export function createGameEngine(config = {}) {
   let wave = 1;
 
   let targetId = 1;
-  let projectileId = 1;
-
   const targets = [];
-  const projectiles = [];
 
   const pointer = {
     x: width * 0.5,
     y: height * 0.5,
     visible: false,
+    locked: false,
     size: POINTER_SIZE,
     color: COLOR_FG,
     flashUntil: 0,
@@ -98,64 +92,43 @@ export function createGameEngine(config = {}) {
     }
   }
 
-  function spawnProjectile(x, y, direction, nowMs) {
-    if (projectiles.length >= MAX_PROJECTILES) {
-      projectiles.shift();
-    }
-
-    const safeDirection = normalize(direction.x, direction.y);
-    projectiles.push({
-      id: projectileId,
-      x,
-      y,
-      vx: safeDirection.x * PROJECTILE_SPEED,
-      vy: safeDirection.y * PROJECTILE_SPEED,
-      radius: PROJECTILE_RADIUS,
-      color: COLOR_FG,
-      bornAt: nowMs,
-    });
-    projectileId += 1;
-    emitter.emit('shoot', { x, y, direction: safeDirection });
+  function respawnTarget(target) {
+    const speed = Math.hypot(target.vx, target.vy) || TARGET_BASE_SPEED;
+    const angle = randomRange(0, Math.PI * 2);
+    const direction = normalize(Math.cos(angle), Math.sin(angle));
+    target.x = randomRange(TARGET_SPAWN_MARGIN, width - TARGET_SPAWN_MARGIN);
+    target.y = randomRange(TARGET_SPAWN_MARGIN, height - TARGET_SPAWN_MARGIN);
+    target.vx = direction.x * speed;
+    target.vy = direction.y * speed;
   }
 
-  function removeOutOfBoundsProjectiles() {
-    for (let i = projectiles.length - 1; i >= 0; i -= 1) {
-      const projectile = projectiles[i];
-      if (
-        projectile.x < -40 ||
-        projectile.x > width + 40 ||
-        projectile.y < -40 ||
-        projectile.y > height + 40
-      ) {
-        projectiles.splice(i, 1);
+  function fireHitscan(pointerX, pointerY) {
+    emitter.emit('shoot', { x: pointerX, y: pointerY });
+
+    for (let i = 0; i < targets.length; i += 1) {
+      const target = targets[i];
+      if (distance(pointerX, pointerY, target.x, target.y) >= target.radius) {
+        continue;
       }
+
+      score += 1;
+      emitter.emit('hit', { score, targetId: target.id });
+      emitter.emit('score', score);
+      respawnTarget(target);
+      return;
     }
+
+    emitter.emit('miss', { x: pointerX, y: pointerY });
   }
 
-  function resolveCollisions() {
-    for (let p = projectiles.length - 1; p >= 0; p -= 1) {
-      const projectile = projectiles[p];
-      let hit = false;
-
-      for (let t = targets.length - 1; t >= 0; t -= 1) {
-        const target = targets[t];
-        const radii = projectile.radius + target.radius;
-        if (distance(projectile.x, projectile.y, target.x, target.y) > radii) {
-          continue;
-        }
-
-        targets.splice(t, 1);
-        hit = true;
-        score += 1;
-        emitter.emit('hit', { score, targetId: target.id });
-        emitter.emit('score', score);
-        break;
-      }
-
-      if (hit) {
-        projectiles.splice(p, 1);
+  function detectTargetLock(pointerX, pointerY) {
+    for (let i = 0; i < targets.length; i += 1) {
+      const target = targets[i];
+      if (distance(pointerX, pointerY, target.x, target.y) < target.radius) {
+        return true;
       }
     }
+    return false;
   }
 
   function maybeAdvanceWave() {
@@ -185,14 +158,6 @@ export function createGameEngine(config = {}) {
     }
   }
 
-  function updateProjectiles(dt) {
-    for (let i = 0; i < projectiles.length; i += 1) {
-      const projectile = projectiles[i];
-      projectile.x += projectile.vx * dt;
-      projectile.y += projectile.vy * dt;
-    }
-  }
-
   function update(dt, inputSnapshot, gestureSnapshot, nowMs) {
     if (!running) {
       return;
@@ -204,24 +169,18 @@ export function createGameEngine(config = {}) {
       pointer.visible = true;
       pointer.x = inputSnapshot.pointer.x;
       pointer.y = inputSnapshot.pointer.y;
+      pointer.locked = detectTargetLock(pointer.x, pointer.y);
     } else {
       pointer.visible = false;
+      pointer.locked = false;
     }
 
     if (gestureSnapshot?.shoot && pointer.visible) {
-      spawnProjectile(
-        pointer.x - gestureSnapshot.direction.x * RECOIL_PIXELS,
-        pointer.y - gestureSnapshot.direction.y * RECOIL_PIXELS,
-        gestureSnapshot.direction,
-        nowMs,
-      );
-      pointer.flashUntil = nowMs + 40;
+      fireHitscan(pointer.x, pointer.y);
+      pointer.flashUntil = nowMs + 100;
     }
 
     updateTargets(safeDt);
-    updateProjectiles(safeDt);
-    resolveCollisions();
-    removeOutOfBoundsProjectiles();
     maybeAdvanceWave();
   }
 
@@ -232,7 +191,7 @@ export function createGameEngine(config = {}) {
       score,
       wave,
       targets,
-      projectiles,
+      projectiles: [],
       pointer,
       colors: {
         fg: COLOR_FG,
@@ -259,7 +218,6 @@ export function createGameEngine(config = {}) {
     score = 0;
     wave = 1;
     targets.length = 0;
-    projectiles.length = 0;
     spawnWave(wave);
     emitter.emit('score', score);
     emitter.emit('waveChange', wave);

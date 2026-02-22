@@ -7,6 +7,7 @@ import { lerp, normalize } from '../utils/math.js';
 
 const WRIST_INDEX = 0;
 const INDEX_TIP_INDEX = 8;
+const MIN_HANDEDNESS_SCORE = 0.7;
 
 function describeCause(cause) {
   if (cause instanceof Error) {
@@ -173,6 +174,10 @@ export function createHandTracker({
   let streamRef = null;
   let landmarker = null;
   let previousSmoothedLandmarks = [];
+  let pointerInitialized = false;
+  let previousPointerX = width * 0.5;
+  let previousPointerY = height * 0.5;
+  let debugFrameCounter = 0;
 
   const state = createEmptyState();
 
@@ -186,6 +191,19 @@ export function createHandTracker({
       state.landmarks = null;
       state.handedness = null;
       previousSmoothedLandmarks = [];
+      pointerInitialized = false;
+      return;
+    }
+
+    const handednessScore = results.handednesses?.[index]?.[0]?.score ?? 0;
+    if (handednessScore < MIN_HANDEDNESS_SCORE) {
+      state.hasHand = false;
+      state.pointer.visible = false;
+      state.rawLandmarks = null;
+      state.landmarks = null;
+      state.handedness = null;
+      previousSmoothedLandmarks = [];
+      pointerInitialized = false;
       return;
     }
 
@@ -201,9 +219,19 @@ export function createHandTracker({
 
     const wrist = smooth[WRIST_INDEX];
     const indexTip = smooth[INDEX_TIP_INDEX];
+    const rawIndexTip = rawLandmarks[INDEX_TIP_INDEX];
 
-    const pointerX = (1 - indexTip.x) * width;
-    const pointerY = indexTip.y * height;
+    const rawPointerX = (1 - rawIndexTip.x) * width;
+    const rawPointerY = rawIndexTip.y * height;
+    const pointerX = pointerInitialized
+      ? previousPointerX + (rawPointerX - previousPointerX) * smoothing
+      : rawPointerX;
+    const pointerY = pointerInitialized
+      ? previousPointerY + (rawPointerY - previousPointerY) * smoothing
+      : rawPointerY;
+    pointerInitialized = true;
+    previousPointerX = pointerX;
+    previousPointerY = pointerY;
 
     const direction = normalize(indexTip.x - wrist.x, indexTip.y - wrist.y);
 
@@ -215,6 +243,18 @@ export function createHandTracker({
     state.pointer.visible = true;
     state.direction = direction;
     state.handedness = preferredHandedness;
+
+    if (import.meta.env.DEV) {
+      debugFrameCounter += 1;
+      if (debugFrameCounter % 30 === 0) {
+        console.debug('[handTracker]', {
+          indexTipX: rawIndexTip.x,
+          indexTipY: rawIndexTip.y,
+          smoothedPointerX: pointerX,
+          smoothedPointerY: pointerY,
+        });
+      }
+    }
   }
 
   function detectFrame() {
@@ -286,6 +326,10 @@ export function createHandTracker({
     const empty = createEmptyState();
     Object.assign(state, empty);
     previousSmoothedLandmarks = [];
+    pointerInitialized = false;
+    previousPointerX = width * 0.5;
+    previousPointerY = height * 0.5;
+    debugFrameCounter = 0;
   }
 
   function getState() {
