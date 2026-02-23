@@ -94,7 +94,7 @@ export function createGestureDetector({
     const direction = normalize(vectorX, vectorY);
 
     if (!gunPose) {
-      return { ...fingerState, gunPose, deltaY, shoot: false, direction, reason: 'pose-invalid' };
+      return { ...fingerState, gunPose, deltaY, direction, reason: 'pose-invalid' };
     }
 
     if (deltaY <= flickThreshold) {
